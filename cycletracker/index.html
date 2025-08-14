@@ -1,59 +1,103 @@
-<!doctype html>
-<html lang="en-US">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width" />
-    <title>Cycle Tracker PWA</title>
-  </head>
-  <body>
-    <h1>CycleTracker Period tracker PWA progress</h1>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>File/Folders Live Edit PWA</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="manifest" href="manifest.json">
 
-    <p>
-      Tutorial:
-      <a
-        href="https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps/Tutorials/Intro/"
-        >CycleTracker: Creating your first PWA</a
-      >
-    </p>
-    <p>Tutorial demos:</p>
-    <ol>
-      <li><a href="html_and_css/index.html">HTML and CSS</a></li>
-      <li>Secure connection (no files)</li>
-      <li>
-        <a href="javascript_functionality/index.html"
-          >JavaScript functionality</a
-        >
-      </li>
-      <li><a href="manifest_file/index.html">Manifest file tutorial</a></li>
-      <li><a href="service_workers/index.html">Service worker tutorial</a></li>
-    </ol>
-    <p>Tutorial files:</p>
-    <ol>
-      <li>
-        <a
-          href="https://github.com/mdn/pwa-examples/tree/main/cycletracker/html_and_css/"
-          >HTML and CSS</a
-        >
-      </li>
-      <li>Secure connection (no files)</li>
-      <li>
-        <a
-          href="https://github.com/mdn/pwa-examples/tree/main/cycletracker/javascript_functionality/"
-          >JavaScript functionality</a
-        >
-      </li>
-      <li>
-        <a
-          href="https://github.com/mdn/pwa-examples/tree/main/cycletracker/manifest_file/"
-          >Manifest file tutorial</a
-        >
-      </li>
-      <li>
-        <a
-          href="https://github.com/mdn/pwa-examples/tree/main/cycletracker/service_workers/"
-          >Service worker tutorial</a
-        >
-      </li>
-    </ol>
-  </body>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 2em; background: #f7f7f7; }
+        #fileList { width: 300px; background: #e9e9e9; padding: 1em; float: left; margin-right: 2em; height: 350px; overflow-y: auto; }
+        #editor { margin-left: 320px; }
+        textarea { width: 100%; height: 300px; margin-top: 10px; font-size: 1rem; }
+        button { margin: 5px; padding: 10px 20px; font-size: 1rem; }
+        input[type="text"] { width: 200px; }
+    </style>
+</head>
+<body>
+    <h1>Live Edit Files & Folders (PWA Example)</h1>
+    <button id="openFolderBtn">Open Folder</button>
+
+    <div id="fileList"></div>
+    <div id="editor" style="display:none;">
+        <input type="text" id="filename" placeholder="File name" />
+        <button id="saveBtn">Save Changes</button>
+        <button id="deleteBtn">Delete File</button>
+        <textarea id="fileContent" placeholder="File content..."></textarea>
+    </div>
+
+    <script>
+    // Service Worker registration for offline PWA
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js').then(reg => {
+            console.log('Service Worker registered.', reg);
+        });
+    }
+
+    // DOM references
+    const openFolderBtn = document.getElementById('openFolderBtn');
+    const fileListDiv = document.getElementById('fileList');
+    const editorDiv = document.getElementById('editor');
+    const fileContent = document.getElementById('fileContent');
+    const filename = document.getElementById('filename');
+    const saveBtn = document.getElementById('saveBtn');
+    const deleteBtn = document.getElementById('deleteBtn');
+
+    // Persistent handles
+    let folderHandle = null;
+    let currentFileHandle = null;
+    let fileHandles = {};
+
+    // Open a folder and list files
+    openFolderBtn.onclick = async () => {
+        if (window.showDirectoryPicker) {
+            folderHandle = await window.showDirectoryPicker();
+            fileHandles = {};
+            fileListDiv.innerHTML = '<b>Files:</b><br><br>';
+            for await (const entry of folderHandle.values()) {
+                if (entry.kind === 'file') {
+                    fileHandles[entry.name] = entry;
+                    const fileBtn = document.createElement('button');
+                    fileBtn.textContent = entry.name;
+                    fileBtn.onclick = () => openFile(entry);
+                    fileListDiv.appendChild(fileBtn);
+                    fileListDiv.appendChild(document.createElement('br'));
+                }
+            }
+        } else {
+            alert('Your browser does not support the File System Access API.');
+        }
+    };
+
+    // Open a file for editing
+    async function openFile(fileHandle) {
+        currentFileHandle = fileHandle;
+        filename.value = fileHandle.name;
+        const file = await fileHandle.getFile();
+        fileContent.value = await file.text();
+        editorDiv.style.display = 'block';
+    }
+
+    // Save edits "live" to file
+    saveBtn.onclick = async () => {
+        if (currentFileHandle) {
+            const writable = await currentFileHandle.createWritable();
+            await writable.write(fileContent.value);
+            await writable.close();
+            alert('Changes saved!');
+        }
+    };
+
+    // Delete file
+    deleteBtn.onclick = async () => {
+        if (folderHandle && currentFileHandle) {
+            await folderHandle.removeEntry(currentFileHandle.name);
+            editorDiv.style.display = 'none';
+            openFolderBtn.onclick(); // refresh file list
+            alert('File deleted!');
+        }
+    };
+    </script>
+</body>
 </html>
